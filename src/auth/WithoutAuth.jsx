@@ -10,7 +10,7 @@ const WithoutAuth = (Component) => {
     if (!access_token || !refresh_token) {
       return <Component {...props} />;
     } else {
-      return (window.location = "/chats");
+      return (window.location.href = "/chats");
     }
   };
   return Auth;

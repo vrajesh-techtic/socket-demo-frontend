@@ -8,6 +8,10 @@ const loginUser = {
 };
 
 const currUser = {
+  isGroup: false,
+  admin: "",
+  groupName: "",
+  users: [],
   convoId: "",
   email: "",
   name: "",
@@ -16,10 +20,11 @@ const currUser = {
 
 const userSlice = createSlice({
   name: "user",
-  initialState: { user: loginUser, currUser: currUser, currIndex: null },
+  initialState: { loginUser, currUser, currIndex: 0 },
   reducers: {
     addUserData(state, action) {
-      state.user = action.payload;
+      state.loginUser = action.payload;
+      console.log("state.loginUser", state.loginUser);
     },
 
     setCurrUserData(state, action) {
@@ -28,6 +33,7 @@ const userSlice = createSlice({
 
     setReduxCurrIndex(state, action) {
       state.currIndex = action.payload;
+      console.log("redux currIndex", state.currIndex);
     },
   },
 });

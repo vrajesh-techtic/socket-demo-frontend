@@ -39,6 +39,8 @@ const Signup = () => {
         navigate("/chats");
       }, 1000);
     } else {
+      setLoading(false);
+
       showToast("error", api?.error);
     }
   };

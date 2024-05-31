@@ -18,6 +18,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(true);
   const onFinish = async (values) => {
+    console.log("values", values);
     const reqObj = {
       reqType: "user",
       route: "/login",
@@ -25,19 +26,22 @@ const Login = () => {
       customHeaders: {},
       data: values,
     };
-    setLoading(() => true);
+    setLoading(true);
     const api = await CustomAPI(reqObj);
-    setLoading(() => false);
     console.log("api", api);
     if (api?.status) {
       showToast("success", api?.message);
+      console.log("api?.data", api?.data);
       // localStorage.setItem("user", JSON.stringify(api?.data));
       dispatch(addUserData(api?.data));
       setTimeout(() => {
-        navigate("/chats");
-      }, 1000);
+        setLoading(false);
+        // navigate("/chats");
+      }, 5000);
     } else {
       showToast("error", api?.error);
+      setLoading(false);
+
     }
   };
   const onFinishFailed = (errorInfo) => {
@@ -52,7 +56,7 @@ const Login = () => {
           setModalOpen={setModalOpen}
           closable={false}
         >
-          <Spin spinning={loading} delay={100}>
+          <Spin spinning={loading}>
             <div className="flex flex-col  bg-white  p-8 rounded-xl">
               <div className="w-full text-center ">
                 <span className="text-4xl">Login</span>

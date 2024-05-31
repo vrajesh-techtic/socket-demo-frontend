@@ -1,69 +1,91 @@
 import React, { useEffect, useState } from "react";
-import { Avatar, Badge, Button, Dropdown, Select, Space, Tooltip } from "antd";
+import {
+  Avatar,
+  Badge,
+  Button,
+  Dropdown,
+  Form,
+  Input,
+  Select,
+  Space,
+  Tooltip,
+} from "antd";
 import { LogoutOutlined, UserOutlined } from "@ant-design/icons";
 import CustomAPI from "../api/CustomAPI";
 import CustomModal from "./CustomModal";
 import useToast from "./NotificationPopup";
 import { useDispatch, useSelector } from "react-redux";
 import { userActions } from "../store/reducers/userReducer";
+import { data } from "autoprefixer";
 
 const LeftChatWindow = ({
   convoList,
   setConvoList,
   allUsers,
-  currIndex,
-  setcurrIndex,
+  socket,
+  fetchConvoList,
 }) => {
-  const [convoModal, setConvoModal] = useState(false);
+  const localUserData = useSelector((state) => state.loginUser);
+  const currIndex = useSelector((state) => state.currIndex);
+  const [groupModal, setGroupModal] = useState(false);
   const [profileModal, setProfileModal] = useState(false);
   const [show, setShow] = useState(true);
 
   const { contextHolder, showToast } = useToast();
 
-  // const localUserData = JSON.parse(localStorage.getItem("user"));
-  const localUserData = useSelector((state) => state.user);
   const dispatch = useDispatch();
   const { setCurrUserData, setReduxCurrIndex } = userActions;
+
+  const changeCurrUserHandler = (index) => {
+    // console.log("convoList[index]", convoList);
+
+    dispatch(setReduxCurrIndex(index));
+    dispatch(setCurrUserData(convoList[index]));
+  };
 
   const newChathandler = async (e) => {
     if (e === localUserData._id) {
       showToast("error", "Cannot chat with yourself!");
     } else {
-      console.log("e", e);
-      const findUser = convoList.findIndex((i) => i.receiverId === e);
+      const newUserData = allUsers.find((i) => i._id === e);
+      console.log("newUserData", newUserData);
+      const reqObj = {
+        reqType: "chat",
+        route: "/add-new-conversation",
+        method: "POST",
+        headers: {
+          withCredentials: true,
+        },
+        data: { receiverId: newUserData?._id },
+      };
 
-      console.log("findUser", findUser);
-      if (findUser !== -1) {
-        setcurrIndex(findUser);
-        dispatch(setReduxCurrIndex(findUser));
-        dispatch(setCurrUserData(convoList[findUser]));
-        // setCurrUser(findUser);
+      const newConvoAPI = await CustomAPI(reqObj);
+      console.log("newConvoAPI", newConvoAPI);
+      if (newConvoAPI?.status) {
+        showToast("success", newConvoAPI?.message);
+        // let newObj = {
+        //   receiverId: newUserData?._id,
+        //   convoId: newConvoAPI?.convoId,
+        //   name: newUserData?.name,
+        // };
+        fetchConvoList();
+        // setConvoList((prev) => {
+        //   let newArr = [...prev];
+
+        //   newArr.push(newObj);
+        //   return newArr;
+        // });
       } else {
-        console.log("User not found!");
-        showToast("success", "New conversation added!");
-        const newUserData = allUsers.find((i) => i._id === e);
-        let newObj = {
-          receiverId: newUserData?._id,
-          convoId: Date.now().toString(),
-          name: newUserData?.name,
-          isNew: true,
-        };
-        setConvoList((prev) => {
-          let newArr = [...prev];
+        // const newUserData = allUsers.find((i) => i._id === e);
 
-          newArr.push(newObj);
-          return newArr;
-        });
-
-        setcurrIndex(convoList.length);
-        dispatch(setReduxCurrIndex(convoList.length));
-        dispatch(setCurrUserData(convoList.length));
-
-        // setCurrUser(convoList.length);
+        const findUser = convoList.findIndex((i) => i.receiverId === e);
+        console.log("findUser", findUser);
+        // showToast("error", newConvoAPI?.error);
+        changeCurrUserHandler(findUser);
       }
-    }
 
-    setConvoModal(false);
+      // console.log("convoList.length", convoList.length);
+    }
   };
 
   const logoutHandler = async () => {
@@ -75,8 +97,35 @@ const LeftChatWindow = ({
       customHeaders: {},
     };
     const api = await CustomAPI(reqObj);
+    socket.emit("leaveRoom", localUserData?._id);
   };
 
+  //   {
+  //     "_id": "664ae6236046ab8f1586c9d5",
+  //     "name": "VD"
+  // }
+
+  const createGroupHandler = async (values) => {
+    console.log("values", values);
+    const reqObj = {
+      reqType: "chat",
+      route: "/create-group",
+      method: "POST",
+      customHeaders: {},
+      data: values,
+    };
+    const api = await CustomAPI(reqObj);
+
+    if (api?.status) {
+      showToast("success", api?.message);
+      fetchConvoList();
+    } else {
+      showToast("error", api?.error);
+    }
+  };
+
+  const options = allUsers.map((i) => ({ label: i.name, value: i._id }));
+  // console.log("convoList", convoList);
   const items = [
     {
       label: <span className="w-full ">Profile</span>,
@@ -86,22 +135,6 @@ const LeftChatWindow = ({
   return (
     <>
       {contextHolder}
-      <CustomModal
-        closable={true}
-        modalOpen={convoModal}
-        setModalOpen={setConvoModal}
-      >
-        <span className="text-xl font-medium">
-          Select a User to start chatting...
-        </span>
-        <div className="p-4 flex justify-around flex-col h-[200px]">
-          <div className="flex justify-center">
-            <Button type="primary" onClick={newChathandler}>
-              Create new chat
-            </Button>
-          </div>
-        </div>
-      </CustomModal>
 
       {/* Profile Modal  */}
       <CustomModal
@@ -140,6 +173,75 @@ const LeftChatWindow = ({
         </div>
       </CustomModal>
 
+      {/* Create Group Modal  */}
+      <CustomModal
+        closable={true}
+        modalOpen={groupModal}
+        setModalOpen={setGroupModal}
+      >
+        <div className="flex flex-col  bg-[#5c6ac4] text-white p-8 rounded-xl">
+          <span className="text-2xl font-medium text-center">Create Group</span>
+          <div className="flex flex-col items-center my-4">
+            {/* <div className="flex-col flex items-center">
+              <Avatar
+                className="w-12 h-12"
+                icon={<UserOutlined className="text-3xl" />}
+              />
+              <span className="text-lg">
+                {localUserData?.lastSeen || "Last Seen"}
+              </span>
+            </div> */}
+
+            <div className="flex flex-col text-black justify-around my-4 bg-white w-[80%] rounded-xl h-fit p-6 text-lg">
+              <Form size="large" onFinish={createGroupHandler}>
+                <Form.Item
+                  label="Group Name"
+                  name="groupName"
+                  rules={[{ type: "string", required: true }]}
+                >
+                  <Input />
+                </Form.Item>
+                <Form.Item
+                  label="Users"
+                  name="users"
+                  rules={[{ type: "array", required: true }]}
+                >
+                  <Select
+                    mode="multiple"
+                    style={{
+                      width: "100%",
+                    }}
+                    placeholder="Please select"
+                    // defaultValue={["a10", "c12"]}
+                    // onChange={handleChange}
+                    options={options}
+                  />
+                </Form.Item>
+
+                <div className="flex justify-center">
+                  <Button type="primary" htmlType="submit">
+                    Create Group
+                  </Button>
+                </div>
+              </Form>
+
+              {/* <span className="text-xl flex items-center my-2">
+                <span className=" me-4 w-[20%]">Name:</span>
+                <span className="border-2 border-black p-1 rounded-lg w-[80%]">
+                  {localUserData?.name}
+                </span>
+              </span>
+              <span className="text-xl flex items-center my-2">
+                <span className=" me-4 w-[20%]">Email:</span>
+                <span className="border-2 border-black p-1 rounded-lg w-[80%]">
+                  {localUserData?.email}
+                </span>
+              </span> */}
+            </div>
+          </div>
+        </div>
+      </CustomModal>
+
       <div className="h-full  ">
         <div className="select-user-container bg-[#5c6ac4] h-[10%] flex items-center w-full px-4 rounded-tl-xl rounded-tr-xl ">
           <Select
@@ -164,6 +266,14 @@ const LeftChatWindow = ({
               label: i?.name,
             }))}
           />
+
+          <Button
+            className="ms-2"
+            type="primary"
+            onClick={() => setGroupModal(true)}
+          >
+            New Group
+          </Button>
         </div>
 
         <div className="user-list-container border-r-2 border-l-2  border-[#B4B4B8] h-[80%] p-4 overflow-auto  w-[100%]">
@@ -187,16 +297,14 @@ const LeftChatWindow = ({
                 }}
                 key={index + 1}
                 onClick={() => {
-                  setcurrIndex(index);
-                  dispatch(setReduxCurrIndex(index));
-                  dispatch(setCurrUserData(convoList[index]));
+                  changeCurrUserHandler(index);
                 }}
               >
                 <div className="flex items-center">
                   <span>
                     <Avatar icon={<UserOutlined />} />
                   </span>
-                  <span className="ms-3">{i.name}</span>
+                  <span className="ms-3">{i.name || i?.groupName}</span>
                 </div>
                 <Badge
                   className="site-badge-count-109"
